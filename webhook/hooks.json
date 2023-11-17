@@ -1,0 +1,45 @@
+[
+  {
+    "id": "deploy-github",
+    "execute-command": "/etc/webhook/deploy-github.sh",
+    "response-message": "Deploying image from Github repository",
+    "pass-environment-to-command": [
+      {
+        "envname": "DOCKER_PASSWORD",
+        "source": "payload",
+        "name": "DOCKER_PASSWORD"
+      },
+      {
+        "envname": "DOCKER_PROJECT",
+        "source": "payload",
+        "name": "DOCKER_PROJECT"
+      },
+      {
+        "envname": "DOCKER_COMPOSE",
+        "source": "payload",
+        "name": "DOCKER_COMPOSE"
+      },
+      {
+        "envname": "DOCKER_TAG",
+        "source": "payload",
+        "name": "DOCKER_TAG"
+      },
+      {
+        "envname": "ENV_VARIABLES",
+        "source": "payload",
+        "name": "ENV_VARIABLES"
+      }
+    ],
+    "trigger-rule-mismatch-http-response-code": 411,
+    "trigger-rule": {
+      "match": {
+        "type": "value",
+        "value": "<SECRET_TOKEN>",
+        "parameter": {
+          "source": "header",
+          "name": "X-Token"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,52 @@
+log:
+  level: INFO
+
+accessLog: {}
+
+api:
+  dashboard: true
+  insecure: false
+  debug: false
+
+entrypoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certResolver: cloudflare
+        domains:
+          - main: bertet.fr
+            sans:
+              - "*.bertet.fr"
+          - main: local.bertet.fr
+            sans:
+              - "*.local.bertet.fr"
+
+serversTransport:
+  insecureSkipVerify: true
+
+providers:
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+
+  docker:
+    exposedbydefault: false
+
+certificatesResolvers:
+  cloudflare:
+    acme:
+      email: <EMAIL>
+      storage: acme.json
+      dnsChallenge:
+        provider: cloudflare
+        resolvers:
+          - "1.1.1.1:53"
+          - "1.0.0.1:53"

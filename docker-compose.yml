@@ -1,0 +1,500 @@
+version: "3.8"
+
+services:
+  
+  ## NETWORK
+  
+  traefik: # Reverse proxy
+    container_name: traefik
+    image: traefik:latest
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    volumes:
+      - ${ROOT_DOCKER}/traefik:/etc/traefik
+      - ${ROOT_DOCKER}/traefik/acme.json:/acme.json
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      priv-lan:
+        ipv4_address: 192.168.1.199
+      frontend:
+    environment:
+      - CF_API_EMAIL=${CF_API_EMAIL}
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.dashboard.tls.certResolver=cloudflare
+      - traefik.http.routers.dashboard.rule=Host(`traefik.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.dashboard.entrypoints=websecure
+      - traefik.http.routers.dashboard.middlewares=local-network@file,redirectregex-dashboard
+      # Middlewares
+      - traefik.http.middlewares.redirectregex-dashboard.redirectregex.regex=^https:\\/\\/([^\\/]+)\\/?$$
+      - traefik.http.middlewares.redirectregex-dashboard.redirectregex.replacement=https://$$1/dashboard
+      # HTTP Services
+      - traefik.http.routers.dashboard.service=api@internal
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  cloudflared: # DNS over https
+    container_name: cloudflared
+    image: cloudflare/cloudflared
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    networks:
+      priv-lan:
+        ipv4_address: 192.168.1.196
+    command: proxy-dns
+    environment:
+      TUNNEL_DNS_UPSTREAM: "https://1.1.1.1/dns-query,https://1.0.0.1/dns-query,https://9.9.9.9/dns-query,https://149.112.112.9/dns-query"
+      TUNNEL_METRICS: "0.0.0.0:8080"
+      TUNNEL_DNS_ADDRESS: 0.0.0.0
+      TUNNEL_DNS_PORT: 1053
+
+  pihole: # DNS sinkhole for ads
+    container_name: pihole
+    image: pihole/pihole
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    volumes:
+      - ${ROOT_DOCKER}/pihole/dnsmasq.d:/etc/dnsmasq.d:rw
+      - ${ROOT_DOCKER}/pihole/pihole:/etc/pihole:rw
+    networks:
+      priv-lan:
+        ipv4_address: 192.168.1.197
+    environment:
+      TZ: ${TIMEZONE}
+      DNS1: 192.168.1.196#1053
+      DNS2: "no"
+      DNSMASQ_LISTENING: local
+      WEBPASSWORD: admin
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.pihole.tls.certResolver=cloudflare
+      - traefik.http.routers.pihole.rule=Host(`pihole.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.pihole.entrypoints=websecure
+      - traefik.http.routers.pihole.middlewares=local-network@file,redirectregex-pihole
+      # Middlewares
+      - traefik.http.middlewares.redirectregex-pihole.redirectregex.regex=https:\\/\\/([^\\/]+)\\/?$$
+      - traefik.http.middlewares.redirectregex-pihole.redirectregex.replacement=https://$$1/admin
+      # HTTP Services
+      - traefik.http.services.pihole.loadbalancer.server.port=80
+  
+  ddns-updater: # Update Cloudflare public IP
+    container_name: ddns-updater
+    image: qmcgaw/ddns-updater
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    volumes:
+      - ${ROOT_DOCKER}/ddns-updater/data:/updater/data
+    networks:
+      frontend:
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.ddns-updater.tls.certResolver=cloudflare
+      - traefik.http.routers.ddns-updater.rule=Host(`ddns-updater.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.ddns-updater.entrypoints=websecure
+      - traefik.http.routers.ddns-updater.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.ddns-updater.loadbalancer.server.port=7999
+
+  unifi-db: # Database for unifi network application
+    image: mongo:4.4 # only up to 4.4 !
+    container_name: unifi-db
+    mem_limit: 2g
+    cpu_shares: 768
+    security_opt:
+      - no-new-privileges:false
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      backend:
+    volumes:
+      - ${ROOT_DOCKER}/unifi/db:/data/db:rw
+      - ${ROOT_DOCKER}/unifi/db/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    restart: on-failure:5
+
+  unifi-network-application: # Network devices management
+    image: ghcr.io/linuxserver/unifi-network-application:latest
+    container_name: unifi-network-application
+    mem_limit: 4g
+    cpu_shares: 1024
+    security_opt:
+      - no-new-privileges:false
+    ports:
+      - 8443:8443       # Required - web admin port
+      - 3478:3478/udp   # Required - STUN port
+      - 10001:10001/udp # Required - AP discovery
+      - 8080:8080       # Required - Device communication
+      #- 1900:1900/udp   # optional - controller discoverable on L2 network
+      #- 8843:8843       # optional - Unifi guest portal HTTPS redirect port
+      #- 8880:8880       # optional - Unifi guest portal HTTP redirect port
+      - 6789:6789       # optional - For mobile throughput test
+      - 5514:5514/udp   # optional - Remote syslog port
+    networks:
+      backend:
+      priv-lan:
+        ipv4_address: 192.168.1.201
+    volumes:
+      - ${ROOT_DOCKER}/unifi/config:/config:rw
+    environment:
+      TZ: ${TIMEZONE}
+      MONGO_USER: ${UNIFI_MONGO_USER}
+      MONGO_PASS: ${UNIFI_MONGO_PASSWORD}
+      MONGO_HOST: unifi-db
+      MONGO_PORT: 27017
+      MONGO_DBNAME: unifi
+      MEM_LIMIT: 2048   # optional - Java memory limit
+      MEM_STARTUP: 2048 # optional - Java initial/minimum memory
+    depends_on:
+      unifi-db:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=priv-lan
+      # HTTP Routers
+      - traefik.http.routers.unifi.tls.certResolver=cloudflare
+      - traefik.http.routers.unifi.rule=Host(`unifi.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.unifi.entrypoints=websecure
+      - traefik.http.routers.unifi.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.unifi.loadbalancer.server.port=8443
+      - traefik.http.services.unifi.loadbalancer.server.scheme=https
+
+  wireguard-easy:
+    container_name: wireguard-easy
+    image: weejewel/wg-easy
+    restart: always
+    networks:
+      priv-lan:
+        ipv4_address: 192.168.1.200
+      frontend:
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+      - net.ipv4.ip_forward=1
+    volumes:
+      - ${ROOT_DOCKER}/wireguard-easy:/etc/wireguard
+    environment:
+      WG_HOST: vpn.bertet.fr
+      WG_DEFAULT_DNS: 192.168.1.197
+      WG_DEVICE: eth1
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.wireguard-easy.tls.certResolver=cloudflare
+      - traefik.http.routers.wireguard-easy.rule=Host(`wireguard-easy.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.wireguard-easy.entrypoints=websecure
+      - traefik.http.routers.wireguard-easy.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.wireguard-easy.loadbalancer.server.port=51821
+
+  openvpn: # Access home from outside
+    build: ${ROOT_DOCKER}/openvpn
+    container_name: openvpn
+    image: dbertet/openvpn
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    volumes:
+      - openvpn-data:/etc/openvpn
+    cap_add:
+     - NET_ADMIN
+    networks:
+      frontend:  
+    command: ovpn_run --proto tcp
+    labels:
+      - traefik.enable=true
+      # TCP Routers
+      - traefik.tcp.routers.vpn.rule=HostSNI(`*`)
+      - traefik.tcp.routers.vpn.entrypoints=websecure
+      # TCP Services
+      - traefik.tcp.services.vpn.loadbalancer.server.port=1194
+
+  ## HOME AUTOMATION
+
+  homebridge: # Fake devices into Homekit
+    container_name: homebridge
+    image: oznu/homebridge
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    volumes:
+      - ${ROOT_DOCKER}/homebridge:/homebridge
+    networks:
+      priv-lan:
+        ipv4_address: 192.168.1.193
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.homebridge.tls.certResolver=cloudflare
+      - traefik.http.routers.homebridge.rule=Host(`homebridge.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.homebridge.entrypoints=websecure
+      - traefik.http.routers.homebridge.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.homebridge.loadbalancer.server.port=8581
+
+  ## TOOLS
+
+  portainer: # Docker container manager
+    container_name: portainer
+    image: portainer/portainer-ce
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    ports:
+      - 8000:8000
+      - 9000:9000
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ${ROOT_DOCKER}/portainer:/data
+    networks:
+      priv-lan:
+        ipv4_address: 192.168.1.195
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.portainer.tls.certResolver=cloudflare
+      - traefik.http.routers.portainer.rule=Host(`portainer.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.portainer.entrypoints=websecure
+      - traefik.http.routers.portainer.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.portainer.loadbalancer.server.port=9000
+
+  watchtower: # Auto update Docker container
+    container_name: watchtower
+    image: containrrr/watchtower
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      frontend:
+    environment:
+      TZ: ${TIMEZONE}
+      WATCHTOWER_MONITOR_ONLY: 'true' # DO NOT UPDATE
+      WATCHTOWER_CLEANUP: 'true' # Remove old images
+      WATCHTOWER_HTTP_API_METRICS: 'true' # Metrics for Prometheus
+      WATCHTOWER_HTTP_API_TOKEN: ${WATCHTOWER_HTTP_API_TOKEN}
+      WATCHTOWER_HTTP_API_UPDATE: 'true'
+      WATCHTOWER_HTTP_API_PERIODIC_POLLS: 'true'
+      WATCHTOWER_SCHEDULE: "0 0 18 ? * MON" # Every monday at 6PM
+      WATCHTOWER_TIMEOUT: 30s
+      WATCHTOWER_NOTIFICATIONS: shoutrrr
+      WATCHTOWER_NOTIFICATION_URL: generic+http://ntfy/watchtower?title=WatchtowerUpdates
+        # WATCHTOWER_ROLLING_RESTART: 'true'
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.watchtower.tls.certResolver=cloudflare
+      - traefik.http.routers.watchtower.rule=Host(`watchtower.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.watchtower.entrypoints=websecure
+      - traefik.http.routers.watchtower.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.watchtower.loadbalancer.server.port=8080
+
+  openspeedtest: # Test internal network speed
+    container_name: openspeedtest
+    image: openspeedtest/latest:latest
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      frontend:
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.openspeedtest.tls.certResolver=cloudflare
+      - traefik.http.routers.openspeedtest.rule=Host(`openspeedtest.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.openspeedtest.entrypoints=websecure
+      - traefik.http.routers.openspeedtest.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.openspeedtest.loadbalancer.server.port=3000
+
+  ntfy: # Push notification
+    container_name: ntfy
+    image: binwiederhier/ntfy
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    networks:
+      frontend:
+    volumes:
+      - ${ROOT_DOCKER}/ntfy/cache:/var/cache/ntfy
+      - ${ROOT_DOCKER}/ntfy:/etc/ntfy
+    command: serve
+    environment:
+      TZ: ${TIMEZONE}
+      NTFY_BEHIND_PROXY: 'true'
+      NTFY_CACHE_FILE: /var/cache/ntfy/cache.db
+      NTFY_CACHE_DURATION: 168h
+      NTFY_BASE_URL: 'https://ntfy.${LOCAL_DOMAIN_NAME}'
+      NTFY_WEB_PUSH_PUBLIC_KEY: ${NTFY_WEB_PUSH_PUBLIC_KEY}
+      NTFY_WEB_PUSH_PRIVATE_KEY: ${NTFY_WEB_PUSH_PRIVATE_KEY}
+      NTFY_WEB_PUSH_FILE: /var/cache/ntfy/webpush.db
+      NTFY_WEB_PUSH_EMAIL_ADDRESS: ${EMAIL}
+      NTFY_UPSTREAM_BASE_URL: "https://ntfy.sh"
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.ntfy.rule=Host(`ntfy.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.ntfy.entrypoints=websecure
+      - traefik.http.routers.ntfy.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.ntfy.loadbalancer.server.port=80
+
+  n8n: # Workflow automation
+    container_name: n8n
+    image: docker.n8n.io/n8nio/n8n
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    networks:
+      frontend:
+    volumes:
+      # You MUST chown 1000:1000 these 2
+      - ${ROOT_DOCKER}/n8n/data:/home/node/.n8n
+      - ${ROOT_DOCKER}/n8n/files:/files
+    environment:
+      N8N_HOST: n8n.${LOCAL_DOMAIN_NAME}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      NODE_ENV: production
+      WEBHOOK_URL: https://n8n.${LOCAL_DOMAIN_NAME}/
+      GENERIC_TIMEZONE: ${TIMEZONE}
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.n8n.rule=Host(`n8n.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.n8n.entrypoints=websecure
+      - traefik.http.routers.n8n.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.n8n.loadbalancer.server.port=5678
+
+  vaultwarden-server: # Bitwarden server
+    container_name: vaultwarden-server
+    image: vaultwarden/server:latest
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    volumes:
+      - ${ROOT_DOCKER}/bitwarden:/data
+    networks:
+      priv-lan:
+        ipv4_address: 192.168.1.194
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.vault.tls.certResolver=cloudflare
+      - traefik.http.routers.vault.rule=Host(`vault.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.vault.entrypoints=websecure
+      - traefik.http.routers.vault.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.vault.loadbalancer.server.port=80
+
+  dashy: # Dashboard to centralize all the links
+    container_name: dashy
+    image: lissy93/dashy:latest
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    volumes:
+      - ${ROOT_DOCKER}/dashy/conf.yml:/app/public/conf.yml
+    healthcheck:
+      test: ['CMD', 'node', '/app/services/healthcheck']
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 25s
+    networks:
+      frontend:
+    environment:
+      UID: 1030
+      GID: 100
+      NODE_ENV: production
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.dashy.tls.certResolver=cloudflare
+      - traefik.http.routers.dashy.rule=Host(`dashy.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.dashy.entrypoints=websecure
+      - traefik.http.routers.dashy.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.dashy.loadbalancer.server.port=80
+
+  webhook: # Trigger scripts from url (ex: deploy server)
+    build: ${ROOT_DOCKER}/webhook # Custom build to give access to Docker
+    container_name: webhook
+    image: dbertet/webhook:2.8.0
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    ports:
+      - 9000:9000
+    network_mode: bridge
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "5"
+    volumes:
+      - ${ROOT_DOCKER}/webhook:/etc/webhook:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -verbose -hooks=/etc/webhook/hooks.json -hotreload
+
+  ## SERVICES
+
+  old-portfolio:
+    container_name: old-portfolio
+    restart: always
+    image: 'trafex/php-nginx'
+    networks:
+      frontend:
+    volumes:
+      - ${ROOT_DOCKER}/old-portfolio.bertet.fr/:/var/www/html
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.old-portfolio.tls.certResolver=cloudflare
+      - traefik.http.routers.old-portfolio.rule=Host(`david.bertet.fr`) && (Path(`/old`) || PathPrefix(`/old/`))
+      - traefik.http.routers.old-portfolio.entrypoints=websecure
+      - traefik.http.routers.old-portfolio.middlewares=strip-old-prefix@docker
+      - traefik.http.middlewares.strip-old-prefix.stripprefix.prefixes=/old
+      - traefik.http.middlewares.strip-old-prefix.stripprefix.forceSlash=false
+      - traefik.http.services.old-portfolio.loadbalancer.server.port=8080
+
+volumes:
+  openvpn-data:
+    external: true
+
+networks:
+  frontend:
+    name: frontend
+    driver: bridge
+  backend:
+    name: backend
+    driver: bridge
+  priv-lan:
+    name: priv-lan
+    driver: macvlan
+    driver_opts:
+      parent: ovs_eth0 # using ifconfig
+    ipam:
+      config:
+        - subnet: 192.168.1.0/24
+          ip_range: 192.169.1.25/32
+          gateway: 192.168.1.1

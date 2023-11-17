@@ -1,0 +1,25 @@
+http:
+  routers:
+    homeassistant:
+      entryPoints:
+        - websecure
+      rule: Host(`home.local.bertet.fr`)
+      middlewares:
+        - local-network
+      tls:
+        certResolver: cloudflare
+      service: homeassistant
+  
+  services:
+    homeassistant:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.101:8123"
+
+  middlewares:
+    local-network:
+      ipWhiteList:
+        sourceRange:
+          - "192.168.1.0/24" # From Home
+          - "172.20.0.0/24" # From VPN
+ 

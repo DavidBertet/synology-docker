@@ -1,0 +1,195 @@
+appConfig:
+  theme: argon
+  language: en
+  layout: auto
+  iconSize: medium
+  startingView: default
+  defaultOpeningMethod: newtab
+  statusCheck: false
+  statusCheckInterval: 0
+  faviconApi: allesedv
+  routingMode: history
+  enableMultiTasking: false
+  widgetsAlwaysUseProxy: false
+  webSearch:
+    disableWebSearch: false
+    searchEngine: duckduckgo
+    openingMethod: newtab
+    searchBangs: {}
+  enableFontAwesome: true
+  enableMaterialDesignIcons: false
+  hideComponents:
+    hideHeading: false
+    hideNav: false
+    hideSearch: false
+    hideSettings: false
+    hideFooter: false
+  auth:
+    enableGuestAccess: false
+    users: []
+    enableKeycloak: false
+  showSplashScreen: false
+  preventWriteToDisk: false
+  preventLocalSave: false
+  disableConfiguration: false
+  disableConfigurationForNonAdmin: false
+  allowConfigEdit: true
+  enableServiceWorker: false
+  disableContextMenu: false
+  disableUpdateChecks: false
+  disableSmartSort: false
+  enableErrorReporting: false
+pageInfo:
+  title: Home Lab
+  description: ''
+  navLinks: []
+  footerText: ''
+sections:
+  - name: Local Network
+    items:
+      - &ref_0
+        title: Pihole
+        icon: hl-pihole
+        url: https://pihole.local.bertet.fr/admin
+        target: null
+        id: 0_1269_pihole
+      - &ref_1
+        title: Portainer
+        icon: hl-portainer
+        url: https://portainer.local.bertet.fr
+        target: null
+        id: 1_1269_portainer
+      - &ref_2
+        title: Traefik
+        icon: hl-traefik
+        url: https://traefik.local.bertet.fr
+        target: null
+        id: 2_1269_traefik
+      - &ref_3
+        title: Homebridge
+        icon: hl-homebridge
+        url: https://homebridge.local.bertet.fr
+        id: 3_1269_homebridge
+      - &ref_4
+        title: Home Assistant
+        icon: hl-home-assistant
+        url: https://home.local.bertet.fr
+        id: 4_1269_homeassistant
+      - &ref_5
+        title: Synology
+        icon: hl-synology-dsm
+        url: https://192.168.1.100:5001
+        id: 5_1269_synology
+      - &ref_6
+        title: Surveillance
+        icon: hl-synology-surveillance-station
+        url: https://192.168.1.100:5001/webman/3rdparty/SurveillanceStation/
+        id: 6_1269_surveillance
+      - &ref_7
+        title: Octoprint
+        icon: hl-octoprint
+        url: http://192.168.1.68
+        id: 7_1269_octoprint
+      - &ref_8
+        title: Router
+        icon: hl-dd-wrt-light
+        url: http://192.168.1.1
+        id: 8_1269_router
+      - &ref_9
+        title: Bitwarden
+        icon: hl-bitwarden
+        url: https://vault.local.bertet.fr
+        id: 9_1269_bitwarden
+      - &ref_10
+        title: DDNSUpdater
+        icon: hl-ddns-updater
+        url: https://ddns-updater.local.bertet.fr
+        id: 10_1269_ddnsupdater
+      - &ref_11
+        title: Ntfy
+        icon: hl-ntfy-light
+        url: https://ntfy.local.bertet.fr
+        id: 11_1269_ntfy
+      - &ref_12
+        title: Watchtower
+        icon: hl-watchtower
+        url: https://watchtower.local.bertet.fr
+        id: 12_1269_watchtower
+      - &ref_13
+        title: n8n
+        icon: hl-n8n
+        url: https://n8n.local.bertet.fr
+        id: 13_1269_nn
+      - &ref_14
+        title: Windmill
+        icon: hl-windmill
+        url: https://windmill.local.bertet.fr
+        id: 14_1269_windmill
+      - &ref_15
+        title: Wireguard
+        icon: hl-wireguard
+        url: http://192.168.1.200:51821/
+        id: 15_1269_wireguard
+      - &ref_16
+        title: Unifi
+        icon: hl-unifi
+        url: https://unifi.local.bertet.fr
+        id: 16_1269_unifi
+      - &ref_17
+        title: OpenSpeedTest
+        icon: hl-openspeedtest
+        url: https://openspeedtest.local.bertet.fr
+        id: 17_1269_openspeedtest
+    displayData:
+      sortBy: default
+      rows: 1
+      cols: 3
+      collapsed: false
+      hideForGuests: false
+    filteredItems:
+      - *ref_0
+      - *ref_1
+      - *ref_2
+      - *ref_3
+      - *ref_4
+      - *ref_5
+      - *ref_6
+      - *ref_7
+      - *ref_8
+      - *ref_9
+      - *ref_10
+      - *ref_11
+      - *ref_12
+      - *ref_13
+      - *ref_14
+      - *ref_15
+      - *ref_16
+      - *ref_17
+  - name: Internet
+    displayData:
+      sortBy: default
+      rows: 1
+      cols: 1
+      collapsed: false
+      hideForGuests: false
+    items:
+      - &ref_18
+        title: GitHub
+        description: Source code and documentation on GitHub
+        icon: fab fa-github
+        url: https://github.com/davidbertet
+        id: 0_841_github
+      - &ref_19
+        title: Portfolio
+        icon: fas fa-user
+        url: https://david.bertet.fr
+        id: 1_841_portfolio
+      - &ref_20
+        title: Old portfolio
+        icon: fas fa-poo
+        url: https://david.bertet.fr/old
+        id: 2_841_oldportfolio
+    filteredItems:
+      - *ref_18
+      - *ref_19
+      - *ref_20
