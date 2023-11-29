@@ -496,5 +496,5 @@ networks:
     ipam:
       config:
         - subnet: 192.168.1.0/24
-          ip_range: 192.169.1.25/32
+          ip_range: 192.168.1.25/32
           gateway: 192.168.1.1
