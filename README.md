@@ -16,9 +16,27 @@ A bridge network I'm using for most of the tools.
 
 A macvlan network I'm using to expose some tools directly to my local network.
 
+This contains values that are specific to my network / server, you might have to update them. Look at the [documentation](https://docs.docker.com/network/drivers/macvlan/#bridge-mode) to find out what values to use
+
 ### Backend
 
 A bridge network I'm using for Unifi.
+
+## Useful commands
+
+Once you renamed `.env.example` to `.env` and filled it, you can run the following commands.
+
+To install every tools:
+```shell
+docker-compose up -d
+```
+
+To install one tool:
+```shell
+docker-compose up -d <service-name>
+# Ex.
+docker-compose up -d traefik
+```
 
 ## Tools
 
@@ -98,10 +116,10 @@ A dashboard to centralize the links of all the tools.
 
 #### [Webhook](https://github.com/adnanh/webhook/)
 
-A webhook server that I'm using to trigger deployment of my portfolio from Github.
+A webhook server that I'm using to trigger the deployment of my [portfolio](https://github.com/davidbertet/portfolio) from a Github Action.
 
 I created my own image to have access to Docker.
 
 #### [Old portofolio](https://david.bertet.fr/old)
 
-An old PHP portfolio I'm keeping around
+An old PHP portfolio I'm keeping around.
