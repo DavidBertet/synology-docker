@@ -457,6 +457,83 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     command: -verbose -hooks=/etc/webhook/hooks.json -hotreload
 
+  shlink-db: # Url shortener - database
+    image: postgres:16
+    container_name: shlink-db
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-d", "shlink", "-U", "shlinkuser"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      frontend:
+    volumes:
+      - ${ROOT_DOCKER}/shlink/db:/var/lib/postgresql/data:rw
+    environment:
+      POSTGRES_DB: shlink
+      POSTGRES_USER: shlinkuser
+      POSTGRES_PASSWORD: shlinkpw
+
+  shlink: # Url shortener - service
+    image: shlinkio/shlink:stable
+    container_name: shlink
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    environment:
+      TIMEZONE: ${TIMEZONE}
+      INITIAL_API_KEY: ${SHLINK_API_KEY}
+      DB_DRIVER: postgres
+      DB_NAME: shlink
+      DB_USER: shlinkuser
+      DB_PASSWORD: shlinkpw
+      DB_HOST: shlink-db
+      DB_PORT: 5432
+      DEFAULT_DOMAIN: url.bertet.fr
+      IS_HTTPS_ENABLED: true
+    networks:
+      frontend:
+    depends_on:
+      shlink-db:
+        condition: service_started
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.shlink.tls.certResolver=cloudflare
+      - traefik.http.routers.shlink.rule=Host(`url.bertet.fr`)
+      - traefik.http.routers.shlink.entrypoints=websecure
+      # HTTP Services
+      - traefik.http.services.shlink.loadbalancer.server.port=8080
+
+  shlink-web: # Url shortener - web interface
+    image: shlinkio/shlink-web-client:stable
+    container_name: shlink-web
+    security_opt:
+      - no-new-privileges:true
+    restart: always
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8080/ || exit 1
+    environment:
+      SHLINK_SERVER_NAME: bertet
+      SHLINK_SERVER_URL: https://url.bertet.fr
+      SHLINK_SERVER_API_KEY: ${SHLINK_API_KEY}
+    networks:
+      frontend:
+    depends_on:
+      - shlink
+    labels:
+      - traefik.enable=true
+      # HTTP Routers
+      - traefik.http.routers.shlink-web.tls.certResolver=cloudflare
+      - traefik.http.routers.shlink-web.rule=Host(`shlink.${LOCAL_DOMAIN_NAME}`)
+      - traefik.http.routers.shlink-web.entrypoints=websecure
+      - traefik.http.routers.shlink-web.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.shlink-web.loadbalancer.server.port=8080
+
   ## SERVICES
 
   old-portfolio:
