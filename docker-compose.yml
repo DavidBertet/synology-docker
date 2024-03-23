@@ -94,6 +94,7 @@ services:
       - no-new-privileges:true
     restart: always
     volumes:
+      # Folder has to be chown 1000:1000
       - ${ROOT_DOCKER}/ddns-updater/data:/updater/data
     networks:
       frontend:
