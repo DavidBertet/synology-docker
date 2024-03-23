@@ -58,6 +58,8 @@ It is configured to use Cloudflared to resolve DNS over https.
 
 My IP address isn't static, this tool keeps my domain on Cloudflare synced with my public IP address.
 
+The configuration has to be done in `ddns-updater/data/config.json`
+
 #### [Unifi Network Application (ex Controller)](https://ui.com/) / Database
 
 I'm using Unifi devices on my local network. This is used to setup them.
@@ -123,3 +125,7 @@ I created my own image to have access to Docker.
 #### [Old portofolio](https://david.bertet.fr/old)
 
 An old PHP portfolio I'm keeping around.
+
+#### [Shlink](https://shlink.io/)
+
+A URL shortener I'm using to share links.
