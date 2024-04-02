@@ -505,12 +505,23 @@ services:
         condition: service_started
     labels:
       - traefik.enable=true
+      ## Url
       # HTTP Routers
-      - traefik.http.routers.shlink.tls.certResolver=cloudflare
-      - traefik.http.routers.shlink.rule=Host(`url.bertet.fr`)
-      - traefik.http.routers.shlink.entrypoints=websecure
+      - traefik.http.routers.shlink-url.tls.certResolver=cloudflare
+      - traefik.http.routers.shlink-url.service=shlink-url
+      - traefik.http.routers.shlink-url.rule=Host(`url.bertet.fr`) && !PathPrefix(`/rest`)
+      - traefik.http.routers.shlink-url.entrypoints=websecure
       # HTTP Services
-      - traefik.http.services.shlink.loadbalancer.server.port=8080
+      - traefik.http.services.shlink-url.loadbalancer.server.port=8080
+      ## Settings
+      # HTTP Routers
+      - traefik.http.routers.shlink-settings.tls.certResolver=cloudflare
+      - traefik.http.routers.shlink-settings.service=shlink-settings
+      - traefik.http.routers.shlink-settings.rule=Host(`url.bertet.fr`) && PathPrefix(`/rest`)
+      - traefik.http.routers.shlink-settings.entrypoints=websecure
+      - traefik.http.routers.shlink-settings.middlewares=local-network@file
+      # HTTP Services
+      - traefik.http.services.shlink-settings.loadbalancer.server.port=8080
 
   shlink-web: # Url shortener - web interface
     image: shlinkio/shlink-web-client:stable
