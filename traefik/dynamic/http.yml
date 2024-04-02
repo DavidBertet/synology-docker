@@ -3,7 +3,7 @@ http:
     homeassistant:
       entryPoints:
         - websecure
-      rule: Host(`home.local.bertet.fr`)
+      rule: Host(`home.{{ env "LOCAL_DOMAIN_NAME" }}`)
       middlewares:
         - local-network
       tls:
