@@ -355,6 +355,7 @@ services:
     labels:
       - traefik.enable=true
       # HTTP Routers
+      - traefik.http.routers.ntfy.tls.certResolver=cloudflare
       - traefik.http.routers.ntfy.rule=Host(`ntfy.${LOCAL_DOMAIN_NAME}`)
       - traefik.http.routers.ntfy.entrypoints=websecure
       - traefik.http.routers.ntfy.middlewares=local-network@file
@@ -383,6 +384,7 @@ services:
     labels:
       - traefik.enable=true
       # HTTP Routers
+      - traefik.http.routers.shlink-web.tls.certResolver=cloudflare
       - traefik.http.routers.n8n.rule=Host(`n8n.${LOCAL_DOMAIN_NAME}`)
       - traefik.http.routers.n8n.entrypoints=websecure
       - traefik.http.routers.n8n.middlewares=local-network@file
