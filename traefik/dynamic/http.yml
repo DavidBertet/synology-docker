@@ -18,7 +18,7 @@ http:
 
   middlewares:
     local-network:
-      ipWhiteList:
+      ipAllowList:
         sourceRange:
           - "192.168.1.0/24" # From Home
           - "172.20.0.0/24" # From VPN
